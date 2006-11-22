@@ -32,11 +32,12 @@
 
 #include "u/libu.h"
 #include "wsman-types.h"
-#include "wsman-soap.h"
+#include "wsman-faults.h"
+#include "wsman-soap-message.h"
+#include "wsman-server-api.h"
 
 #define OPENWSMAN
 
-#include "wsman-plugins.h"
 
 /*--------------------------------------------------------------------------*/
 /*                                                                          */
@@ -61,6 +62,18 @@ static pool *wsman_pool = NULL;
  * We'll fill it in at the end of the module.
  */
 module MODULE_VAR_EXPORT wsman_module;
+
+/*
+ * Dump a line to a file
+ */
+static void loggit( char *logStr ) {
+   fprintf( stderr, "wsmanTest  %s\n", logStr );
+}
+
+
+static void jg_printhdr( void *r, char *key, char* val ) {
+    fprintf( stderr, "wsmanTest hdr key = %s  val = %s\n", key, val );
+}
 
 /*--------------------------------------------------------------------------*/
 /*                                                                          */
@@ -87,21 +100,22 @@ module MODULE_VAR_EXPORT wsman_module;
  */
 static int wsman_handler(request_rec *r)
 {
+    loggit( "cmd handler");
+
+    loggit( "Headers" );
+    ap_table_do((int (*) (void *, const char *, const char *))
+                jg_printhdr, (void *) r, r->headers_in, NULL);
+    loggit( "/Headers" );
+
     char *bodyBlock = ap_pcalloc( wsman_pool, 1024 );
+    loggit( "Body" );
 
     ap_setup_client_block( r, REQUEST_CHUNKED_DECHUNK );
     if (ap_should_client_block( r ) != 0) {
-    	long len = ap_get_client_block( r, bodyBlock, 1023 );
-    	while (len > 0) {
-    		bodyBlock[len]=0;
-    		fullMsg = (fullMsg==NULL) ? ap_pstrdup( wsman_pool, bodyBlock ):
-    									ap_pstrcat( wsman_pool, fullMsg, bodyBlock );
-	    	len = ap_get_client_block( r, bodyBlock, 1023 );
-    	}
-
-		wsman_msg->request.body = fullMsg;
-		wsman_msg->request.length = strlen( fullMsg );
-	}
+       while (ap_get_client_block( r, bodyBlock, 1024 ) > 0)
+          fprintf( stderr, "%s", bodyBlock );
+    }
+    loggit("/Body" );
 
     /*
      * We're about to start sending content, so we need to force the HTTP
@@ -135,17 +149,18 @@ static int wsman_handler(request_rec *r)
      * "text/html", we need to embed any HTML.
      */
 
-    SoapH *soap = (SoapH *)ap_get_module_config(r->server->module_config, &wsman_module);
+    void* soap = (void *)ap_get_module_config(r->server->module_config, &wsman_module);
     if (soap != NULL) {
-	    WsmanMessage *wsman_msg;
-	    wsman_msg = wsman_soap_message_new();
-	    wsman_msg->request.body = bodyBlock;
-	    wsman_msg->request.length = strlen( bodyBlock );
+            WsmanMessage *wsman_msg;
+            wsman_msg = wsman_soap_message_new();
+            u_buf_set(wsman_msg->request, bodyBlock, strlen(bodyBlock));
+            
+            wsman_server_get_response((void*)soap, wsman_msg);
 
-	    // Call dispatcher
-	    dispatch_inbound_call(soap, wsman_msg);
-	
-	    ap_rputs( wsman_msg->response.body, r );
+            char *response = u_strdup((char *)u_buf_ptr(wsman_msg->response));
+	    ap_rputs( response, r );
+            wsman_soap_message_destroy(wsman_msg);
+            u_free(response);
 	
 	   /*
 	     * We're all done, so cancel the timeout we set.  Since this is probably
@@ -155,6 +170,7 @@ static int wsman_handler(request_rec *r)
 	     */
 	    ap_kill_timeout(r);
     } else {
+    	loggit( "cmd handler - NULL soap ptr" );
     }
 
     /*
@@ -206,6 +222,8 @@ static int wsman_handler(request_rec *r)
  */
 static void wsman_init(server_rec *s, pool *p)
 {
+    loggit( "Init " );
+
     /*
      * If we haven't already allocated our module-private pool, do so now.
      */
@@ -223,13 +241,8 @@ static void wsman_init(server_rec *s, pool *p)
  */
 static void *wsman_create_server_config(pool *p, server_rec *s)
 {
-    SoapH soap = NULL;
-    WsManListenerH *listener = wsman_dispatch_list_new();
-    WsContextH cntx = wsman_init_plugins(listener);
-    if (cntx != NULL) {
-	    soap = ws_context_get_runtime(cntx);
-    }
-    return (void *)soap;
+    loggit( "create server config" );
+    return (void *)wsman_server_create_config();
 }
 
 /*--------------------------------------------------------------------------*/
