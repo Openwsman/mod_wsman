@@ -32,6 +32,8 @@
 
 #include "u/libu.h"
 #include "wsman-types.h"
+#include "wsman-faults.h"
+#include "wsman-soap-message.h"
 #include "wsman-server-api.h"
 
 #define OPENWSMAN
@@ -88,6 +90,8 @@ static int wsman_handler(request_rec *r)
 {
     char *bodyBlock = ap_pcalloc( wsman_pool, 1024 );
     char *fullMsg = NULL;
+    
+    WsmanMessage *wsman_msg = wsman_soap_message_new();
 
     ap_setup_client_block( r, REQUEST_CHUNKED_DECHUNK );
     if (ap_should_client_block( r ) != 0) {
@@ -98,6 +102,7 @@ static int wsman_handler(request_rec *r)
     									ap_pstrcat( wsman_pool, fullMsg, bodyBlock );
 	    	len = ap_get_client_block( r, bodyBlock, 1023 );
     	}
+    	wsman_msg->request = (u_buf_t *)fullMsg;
     }
 
     /*
@@ -134,9 +139,8 @@ static int wsman_handler(request_rec *r)
 
     void* soap = (void *)ap_get_module_config(r->server->module_config, &wsman_module);
     if (soap != NULL) {
-            char *response = (char *)wsman_server_get_response((void*)soap, fullMsg);
-	    	ap_rputs( response, r );
-            u_free(response);
+            wsman_server_get_response((void*)soap, wsman_msg );
+	    	ap_rputs( (char *)wsman_msg->response, r );
 
 	   /*
 	     * We're all done, so cancel the timeout we set.  Since this is probably
