@@ -38,7 +38,6 @@
 
 #define OPENWSMAN
 
-
 /*--------------------------------------------------------------------------*/
 /*                                                                          */
 /* Data declarations.                                                       */
@@ -102,7 +101,7 @@ static int wsman_handler(request_rec *r)
     									ap_pstrcat( wsman_pool, fullMsg, bodyBlock );
 	    	len = ap_get_client_block( r, bodyBlock, 1023 );
     	}
-    	wsman_msg->request = (u_buf_t *)fullMsg;
+		u_buf_set(wsman_msg->request, fullMsg, strlen( fullMsg ));
     }
 
     /*
@@ -137,10 +136,11 @@ static int wsman_handler(request_rec *r)
      * "text/html", we need to embed any HTML.
      */
 
-    void* soap = (void *)ap_get_module_config(r->server->module_config, &wsman_module);
+    void* soap = NULL;
+    soap = (void *)ap_get_module_config(r->server->module_config, &wsman_module);
     if (soap != NULL) {
-            wsman_server_get_response((void*)soap, wsman_msg );
-	    	ap_rputs( (char *)wsman_msg->response, r );
+            wsman_server_get_response( soap, wsman_msg );
+	    	ap_rputs( (char *)u_buf_ptr(wsman_msg->response), r );
 
 	   /*
 	     * We're all done, so cancel the timeout we set.  Since this is probably
@@ -218,7 +218,8 @@ static void wsman_init(server_rec *s, pool *p)
  */
 static void *wsman_create_server_config(pool *p, server_rec *s)
 {
-    return (void *)wsman_server_create_config();
+	void *vPtr = (void *)wsman_server_create_config();
+    return vPtr;
 }
 
 /*--------------------------------------------------------------------------*/
