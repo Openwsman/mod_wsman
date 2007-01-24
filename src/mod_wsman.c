@@ -139,6 +139,11 @@ static int wsman_handler(request_rec *r)
     WsmanMessage *wsman_msg = wsman_soap_message_new();
 
     ret = ap_setup_client_block( r, REQUEST_CHUNKED_DECHUNK );
+    if (ap_auth_name(r) == NULL) {
+        send_error_message(r, "Server configuration error, the server has to authenticate all request either with Basic or with Digest authentication.");
+        ap_kill_timeout(r);
+        return OK;
+    } 
     if(OK != ret) {
         send_error_message(r, "Failed to start receiving POST buffer");
         ap_kill_timeout(r);
@@ -153,7 +158,7 @@ static int wsman_handler(request_rec *r)
     									ap_pstrcat( wsman_pool, fullMsg, bodyBlock );
 	    	len = ap_get_client_block( r, bodyBlock, 1023 );
     	}
-		u_buf_set(wsman_msg->request, fullMsg, strlen( fullMsg ));
+	u_buf_set(wsman_msg->request, fullMsg, strlen( fullMsg ));
     } else {
         send_error_message(r, "No body received");
         ap_kill_timeout(r);
@@ -196,7 +201,7 @@ static int wsman_handler(request_rec *r)
     soap = (void *)ap_get_module_config(r->server->module_config, &wsman_module);
     if (soap != NULL) {
             wsman_server_get_response( soap, wsman_msg );
-	    	ap_rputs( (char *)u_buf_ptr(wsman_msg->response), r );
+	    ap_rputs( (char *)u_buf_ptr(wsman_msg->response), r );
 
 	   /*
 	     * We're all done, so cancel the timeout we set.  Since this is probably
