@@ -27,6 +27,20 @@ if test -z "$EXISTS_APXS"; then
    AC_MSG_ERROR([please install the apache apxs tool. Download apache http server from http://www.apache.org, compile and install it and make sure that apxs is in your path])
 fi
 
+AC_CHECK_FUNCS(strtok_r \
+               getpid \
+               strsep \
+               gettimeofday \
+               unlink \
+               syslog \
+               sleep \
+               fnmatch \
+               timegm \
+               daemon  \
+               va_copy
+               )
+
+
 AC_LIBTOOL_DLOPEN
 AC_LIBTOOL_WIN32_DLL
 AM_PROG_LIBTOOL

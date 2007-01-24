@@ -18,6 +18,12 @@
  * Apache example module.  Provide demonstrations of how modules do things.
  *
  */
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <stdio.h>
+#include <syslog.h>
 
 #include "httpd.h"
 #include "http_config.h"
@@ -27,16 +33,54 @@
 #include "http_protocol.h"
 #include "util_script.h"
 
-#include <stdio.h>
-#include <syslog.h>
 
-#include "u/libu.h"
+// #include "u/libu.h"
 #include "wsman-types.h"
 #include "wsman-faults.h"
 #include "wsman-soap-message.h"
 #include "wsman-server-api.h"
 
 #define OPENWSMAN
+
+
+/** helper to write out the headers */
+static int
+list_headers_callback(void *rec, const char *key, const char *value)
+{
+    request_rec *r = (request_rec *) rec;
+    ap_rprintf(r, "%s: %s<br>", key, value);
+    return 1;
+}
+
+/** write out the headers of the request. */
+static void
+list_headers(request_rec * r)
+{
+    ap_table_do(list_headers_callback, r, r->headers_in, NULL);
+}
+
+/** send the error message to the client browser */
+static void
+send_error_message(request_rec * r, const char *error)
+{
+    // ap_log_error(APLOG_MARK, APLOG_ERR, r->server, "mod_wsman: %s", error);
+    r->content_type = "text/html";
+    ap_send_http_header(r);
+    ap_rputs(DOCTYPE_HTML_3_2, r);
+    ap_rputs("<HTML>\n", r);
+    ap_rputs(" <HEAD>\n", r);
+    ap_rputs("  <TITLE>Apache WS-Management Handler\n", r);
+    ap_rputs("  </TITLE>\n", r);
+    ap_rputs(" </HEAD>\n", r);
+    ap_rputs(" <BODY>\n", r);
+    ap_rputs("  <H1>mod_wsman Apache WS-Management Server Error</H1>\n", r);
+    ap_rprintf(r,
+               "<p><strong>%s</strong><br>Please see the documentation for details.</p>",
+               error);
+    ap_rputs("  <H2>Content headers of the request</H2>\n", r);
+    list_headers(r);
+    ap_rputs("</BODY></HTML>\n", r);
+}
 
 /*--------------------------------------------------------------------------*/
 /*                                                                          */
@@ -89,11 +133,19 @@ static int wsman_handler(request_rec *r)
 {
     char *bodyBlock = ap_pcalloc( wsman_pool, 1024 );
     char *fullMsg = NULL;
+    int ret = 0;
+    const char *error = NULL;
     
     WsmanMessage *wsman_msg = wsman_soap_message_new();
 
-    ap_setup_client_block( r, REQUEST_CHUNKED_DECHUNK );
-    if (ap_should_client_block( r ) != 0) {
+    ret = ap_setup_client_block( r, REQUEST_CHUNKED_DECHUNK );
+    if(OK != ret) {
+        send_error_message(r, "Failed to start receiving POST buffer");
+        ap_kill_timeout(r);
+        return OK;
+    }
+    ret = ap_should_client_block(r);
+    if (ret != 0) {
     	long len = ap_get_client_block( r, bodyBlock, 1023 );
     	while (len > 0) {
     		bodyBlock[len]=0;
@@ -102,7 +154,11 @@ static int wsman_handler(request_rec *r)
 	    	len = ap_get_client_block( r, bodyBlock, 1023 );
     	}
 		u_buf_set(wsman_msg->request, fullMsg, strlen( fullMsg ));
-    }
+    } else {
+        send_error_message(r, "No body received");
+        ap_kill_timeout(r);
+        return OK;
+    }   
 
     /*
      * We're about to start sending content, so we need to force the HTTP
@@ -117,7 +173,7 @@ static int wsman_handler(request_rec *r)
      * We also need to start a timer so the server can know if the connexion
      * is broken.
      */
-    r->content_type = "text/html";
+    r->content_type = "application/soap+xml;charset=UTF-8";
 
     ap_soft_timeout("wsman test", r);
     ap_send_http_header(r);
