@@ -279,7 +279,8 @@ static void wsman_init(server_rec *s, pool *p)
  */
 static void *wsman_create_server_config(pool *p, server_rec *s)
 {
-	void *vPtr = (void *)wsman_server_create_config();
+	void *vPtr = (void *)wsman_server_create_config(NULL);
+	
     return vPtr;
 }
 
