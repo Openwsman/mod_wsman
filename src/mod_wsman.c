@@ -99,6 +99,7 @@ send_error_message(request_rec * r, const char *error)
  * data don't get lost.
  */
 static pool *wsman_pool = NULL;
+static char *WsmanConfigLocation = NULL;
 
 /*
  * Declare ourselves so the configuration routines can find and know us.
@@ -279,9 +280,10 @@ static void wsman_init(server_rec *s, pool *p)
  */
 static void *wsman_create_server_config(pool *p, server_rec *s)
 {
-	void *vPtr = (void *)wsman_server_create_config(NULL);
+//    void *vPtr = (void *)wsman_server_create_config(WsmanConfigLocation);
 	
-    return vPtr;
+//    return vPtr;
+    return NULL;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -317,6 +319,19 @@ static const handler_rec wsman_handlers[] =
     {NULL}
 };
 
+static const char *ConfigTag(cmd_parms *cmd, void *mconfig, char *arg)
+    {
+    void *vPtr = (void *)wsman_server_create_config(arg);
+
+    return NULL;
+    }
+
+static command_rec wsman_commands[]=
+    {
+		{ "Configuration", ConfigTag, NULL, ACCESS_CONF|OR_ALL, TAKE1, "Configuration Location"},
+		{ NULL }
+    };
+
 /*--------------------------------------------------------------------------*/
 /*                                                                          */
 /* Finally, the list of callback routines and data structures that          */
@@ -339,8 +354,8 @@ module MODULE_VAR_EXPORT wsman_module =
     NULL,   /* dir config merger */
     wsman_create_server_config,       /* server config creator */
     NULL,        /* server config merger */
-    NULL,               /* command table */
-    wsman_handlers,           /* [9] list of handlers */
+    wsman_commands,         /* command table */
+    wsman_handlers,         /* [9] list of handlers */
     NULL,  					/* [2] filename-to-URI translation */
     NULL,      				/* [5] check/validate user_id */
     NULL,       			/* [6] check user_id is valid *here* */
