@@ -22,8 +22,10 @@
 #include <config.h>
 #endif
 
+
+
+#include <sys/syslog.h>
 #include <stdio.h>
-#include <syslog.h>
 
 #include "httpd.h"
 #include "http_config.h"
@@ -39,8 +41,18 @@
 #include "wsman-faults.h"
 #include "wsman-soap-message.h"
 #include "wsman-server-api.h"
+#include "wsman-debug.h"
 
 #define OPENWSMAN
+
+static void
+debug_message_handler(const char *str,
+		debug_level_e level, void *user_data)
+{
+	fprintf (stderr, "WSManDebug:  %s\n", str);
+	//ap_log_error(APLOG_MARK, APLOG_NOERRNO | APLOG_INFO, (server_rec *)user_data, "%s", str );
+}
+
 
 
 /** helper to write out the headers */
@@ -269,6 +281,8 @@ static void wsman_init(server_rec *s, pool *p)
     if (wsman_pool == NULL) {
         wsman_pool = ap_make_sub_pool(NULL);
     };
+    debug_add_handler(debug_message_handler, DEBUG_LEVEL_ALWAYS, s);
+
 }
 
 /*
@@ -280,10 +294,8 @@ static void wsman_init(server_rec *s, pool *p)
  */
 static void *wsman_create_server_config(pool *p, server_rec *s)
 {
-//    void *vPtr = (void *)wsman_server_create_config(WsmanConfigLocation);
-	
-//    return vPtr;
-    return NULL;
+    void *vPtr = (void *)wsman_server_create_config(NULL);
+    return vPtr;
 }
 
 /*--------------------------------------------------------------------------*/
@@ -321,9 +333,11 @@ static const handler_rec wsman_handlers[] =
 
 static const char *ConfigTag(cmd_parms *cmd, void *mconfig, char *arg)
     {
-    void *vPtr = (void *)wsman_server_create_config(arg);
-
-    return NULL;
+    	server_rec *s = cmd->server;
+    	void* soap = NULL;
+    	soap = (void *)ap_get_module_config(s->module_config, &wsman_module);
+	wsman_server_read_plugin_config(soap, arg);
+    	return NULL;
     }
 
 static command_rec wsman_commands[]=
