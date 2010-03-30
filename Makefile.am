@@ -4,7 +4,7 @@ CFLAGS =   @OPENWSMAN_CFLAGS@
 LDLIBS =   @OPENWSMAN_LIBS@
 LIBEXECDIR = $(shell $(APXS) -q LIBEXECDIR)
 
-EXTRA_DIST = autogen.sh pkg/wsman.conf pkg/mod_wsman.spec
+EXTRA_DIST = bootstrap pkg/wsman.conf pkg/mod_wsman.spec
 CLEANFILES = src/.libs
 
 # override builtin clean-generic to to 'rm -rf'
