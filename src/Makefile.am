@@ -1,10 +1,13 @@
-noinst_SCRIPTS=mod_wsman.so
+all : $(top_builddir)/src/mod_wsman.la
 
-.c.so:
-	apxs  $(OPENWSMAN_CFLAGS) -I../ -I. -DHAVE_CONFIG_H $(OPENWSMAN_LIBS) -c $< 
+EXTRA_DIST += src/mod_wsman.c
+CLEANFILES += src/*.lo src/*.o src/*.la src/*.slo
 
-mod_wsman.so : mod_wsman.c
+$(top_builddir)/src/mod_wsman.la : $(top_srcdir)/src/mod_wsman.c
+	$(APXS) -c $(CFLAGS) $^ $(LDLIBS) -Wc,-Wall -Wc,-Werror -o $@
 
-CLEANFILES=*~ *.o *.so
+$(DESTDIR)$(LIBEXECDIR) :
+	mkdir -p $@
 
-
+install-exec-hook: all $(DESTDIR)$(LIBEXECDIR)
+	$(APXS) -i -S LIBEXECDIR=$(DESTDIR)$(LIBEXECDIR) -n 'mod_wsman' $(top_builddir)/src/mod_wsman.la

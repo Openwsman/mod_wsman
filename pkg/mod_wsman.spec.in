@@ -1,0 +1,69 @@
+# suse dirs
+%if 0%{?suse_version} || 0%{?sles_version}
+    %define apxs /usr/sbin/apxs2
+    %define apache_R  apache2
+    %define apache_BR apache2-devel
+    %define apache_confdir %(%{apxs} -q SYSCONFDIR)/conf.d/
+%endif
+
+# fedora dirs
+%if 0%{?fedora_version} || 0%{?fedora} ||  0%{?rhel_version} || 0%{?rhel}
+    %define apxs /usr/sbin/apxs
+    %define apache_R  httpd
+    %define apache_BR httpd-devel
+    %define apache_confdir %(%{apxs} -q SYSCONFDIR).d/
+%endif
+
+# common
+%define apache_moddir %(%{apxs} -q LIBEXECDIR)
+
+Name:           mod_wsman
+Version:        @PACKAGE_VERSION@
+Release:        1%{?dist}
+Summary:        An Apache module that implements WSMAN interface
+
+Group:          System Environment/Libraries
+License:        ASL 2.0
+URL:            http://openwsman.org
+Source0:        http://openwsman.com/files/%{name}-%{version}.tar.gz
+BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+
+Requires:       %{apache_R}
+BuildRequires:  %{apache_BR} openwsman-devel pkgconfig
+
+
+%description
+Description goes here.
+
+%prep
+%setup -q
+
+
+%build
+%configure
+make %{?_smp_mflags}
+
+
+%install
+rm -rf $RPM_BUILD_ROOT
+make install DESTDIR=$RPM_BUILD_ROOT
+
+#config file
+install -d -m 755 $RPM_BUILD_ROOT%{apache_confdir}
+install -p -m 644 pkg/wsman.conf $RPM_BUILD_ROOT%{apache_confdir}
+
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+
+%files
+%defattr(-,root,root,-)
+#%doc 
+%config(noreplace) %{apache_confdir}/wsman.conf
+%{apache_moddir}/mod_wsman.so
+
+
+%changelog
+* Wed Oct 8 2008 Michael Brown <Michael_E_Brown@Dell.com> - 1.0-1
+- Initial packaging attempt
